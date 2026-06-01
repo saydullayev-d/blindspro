@@ -1,17 +1,21 @@
-from typing import Generator
+"""
+Database configuration and session management
+"""
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session, declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
+
 from app.config import get_settings
+from app.db.models import Base
 
 settings = get_settings()
 
-# Create engine
+# Create database engine
 engine = create_engine(
     settings.database_url,
+    poolclass=StaticPool if "sqlite" in settings.database_url else None,
     echo=settings.debug,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
 )
 
 # Create session factory
@@ -21,12 +25,17 @@ SessionLocal = sessionmaker(
     bind=engine,
 )
 
-# Base for models
-Base = declarative_base()
+
+def init_db():
+    """Initialize database - create all tables"""
+    Base.metadata.create_all(bind=engine)
 
 
-def get_db() -> Generator[Session, None, None]:
-    """Dependency for database session"""
+def get_db() -> Session:
+    """
+    Dependency for getting database session
+    Usage: db: Session = Depends(get_db)
+    """
     db = SessionLocal()
     try:
         yield db
